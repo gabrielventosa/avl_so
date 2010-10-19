@@ -62,16 +62,16 @@ def GetData(FILE_NAME):
 	if ((datatmp.find(HTML_UC_END) != -1) or (datatmp.find(HTML_LC_END) != -1)):
 		data = data + datatmp
 		SER.send(data)
-		SER.send('\r\n')
+		SER.send('\r')
 	else:
 		SER.send('No File found in data')
-		SER.send('\r\n')
+		SER.send('\r')
 		data = -1
 		return data
 
 	uindx = data.find('\r\n')
 	SER.send(data[:uindx])
-	SER.send('\r\n')
+	SER.send('\r')
 	lindx = data.find('<ftpuser>')
 	uindx = data.find('</ftpuser>')
 	ftpuser = data[lindx+9:uindx]
@@ -86,7 +86,7 @@ def GetData(FILE_NAME):
 	res = MDM.receive(TIMEOUT_CONNECT)
 	SER.send('Connection Closed Response:')
 	SER.send(res)
-	SER.send('\r\n')
+	SER.send('\r')
 	res = MDM.send('AT#SH\r',0)
 	res = MDM.receive(TIMEOUT_CONNECT)
 	
@@ -100,16 +100,16 @@ def GetData(FILE_NAME):
 		res = MDM.send('","',0)
 		res = MDM.send(ftppass,0)
 		res = MDM.send('",0\r',0)
-		SER.send('Opening FTP connection\r\n')
+		SER.send('Opening FTP connection\r')
 		SER.send('User: ')
 		SER.send(ftpuser)
 		SER.send(' Password: ')
 		SER.send(ftppass)
-		SER.send('\r\n')
+		SER.send('\r')
 		res = MDM.receive(10*TIMEOUT_CONNECT)
 		SER.send('FTP open result: ')
 		SER.send(res)
-		SER.send('\r\n')
+		SER.send('\r')
 		if (res.find('Already connected') >= 0):
 			res = 'OK'
 	MDM.send('AT#FTPTYPE=0\r',0)
@@ -119,7 +119,7 @@ def GetData(FILE_NAME):
 	MDM.send('"\r',0)
 	SER.send('Requesting File: ')
 	SER.send(FILE_NAME)
-	SER.send('\r\n')
+	SER.send('\r')
 	timer = MOD.secCounter()
 	timeout = timer + 90 #secondi
 	#Retrieve and save data function?
@@ -130,7 +130,7 @@ def GetData(FILE_NAME):
 		
 	if(len(ftpdata) == 0):
 		print "ERROR: data to save is empty \r"
-		SER.send('"ERROR: data to save is empty\r\n"')
+		SER.send('"ERROR: data to save is empty\r"')
 		return -1
 
 	startIndex = 0
@@ -140,18 +140,18 @@ def GetData(FILE_NAME):
 	if(ftpdata.find('NO CARRIER') != -1):
 		endIndex = ftpdata.find('\r\nNO CARRIER')
 	ftpdata= ftpdata[startIndex: endIndex]	
-	SER.send('Checking for MD5\r\n')
+	SER.send('Checking for MD5\r')
 	SER.send('MD5 sent:')
 	SER.send(md5sent)
-	SER.send('\r\n')
+	SER.send('\r')
 	md5calc = md5.new(ftpdata).digest()
 	hexmd5 = md5ToHex(md5calc)
 	SER.send('MD5 calc:')
 	SER.send(hexmd5)
-	SER.send('\r\n')
+	SER.send('\r')
 	if(hexmd5 != md5sent):
 		SER.send('MD5 does not match')
-		SER.send('\r\n')
+		SER.send('\r')
 		data = -1
 		return data
 	
@@ -162,7 +162,7 @@ def Main(FILE_NAME):
 	res = SER.set_speed('115200')
 	res = MDM.send('AT+CMEE=2\r',0)
 	SER.send('Starting Update Script')
-	SER.send('\r\n')
+	SER.send('\r')
 	res = MDM.receive(TIMEOUT_MINIMUM)
 	IMEI = getimei()
 	
@@ -199,7 +199,7 @@ def Main(FILE_NAME):
 	if (res == -1):
 		print 'Error setting PDP context'
 		SER.send('Error setting PDP context')
-		SER.send('\r\n')
+		SER.send('\r')
 		return -1
 	else:
 		res = ' '
@@ -224,7 +224,7 @@ def Main(FILE_NAME):
 		if ( res != -1 ):
 			print 'CONNECTED'
 			SER.send('CONNECTED')
-			SER.send('\r\n')
+			SER.send('\r')
 			
 	############# send the command of getting data
 			res = MDM.send('GET ',0)
@@ -242,13 +242,13 @@ def Main(FILE_NAME):
 	############ get data
 			print 'GETTING DATA'
 			SER.send('GETTING DATA')
-			SER.send('\r\n')
+			SER.send('\r')
 
 			response = -1			
 			data = GetData(FILE_NAME)
 			if (data!= -1):
 				SER.send('DOWNLOAD COMPLETE --- SAVING DATA')
-				SER.send('\r\n')
+				SER.send('\r')
 				print 'DOWNLOAD COMPLETE --- SAVING DATA'
 				f = open(FILE_NAME, 'w')
 				f.write(data)
@@ -257,18 +257,18 @@ def Main(FILE_NAME):
 			else:
 				print 'ERROR GETTING DATA'
 				SER.send('ERROR GETTING DATA')
-				SER.send('\r\n')
+				SER.send('\r')
 			
 		else:
 			SER.send('NO CONNECT')
-			SER.send('\r\n')
+			SER.send('\r')
 			response = -1
 	############# return to OnLineCommandMode
 		MDM.send('AT#FTPCLOSE\r',0)
 		MDM.receive(TIMEOUT_CONNECT)
 		#MDM.send('AT#SGACT=1,0\r',0)
 		MDM.receive(TIMEOUT_CONNECT)
-		SER.send('END of Program\r\n')
+		SER.send('END of Program\r')
 		
 		return response
 
@@ -286,7 +286,7 @@ def getimei():
 	res = MDM.receive(TIMEOUT_MINIMUM)
 	SER.send('Device: ')
 	SER.send(res)
-	SER.send('\r\n')
+	SER.send('\r')
 	if (res.find(':') == -1):
 		return -1
 	index = res.find(':')

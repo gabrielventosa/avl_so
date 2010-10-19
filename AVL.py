@@ -18,6 +18,8 @@ import printdbg
 import CmdMnger
 import SER
 import DelSMS
+import Chronos
+
 
 
 ################## timeout definitions #######################
@@ -40,7 +42,7 @@ def Mainloop():
 	wd.feed()
 	
 	numrep = '5539099305'
-	res = SER.set_speed('115200')
+	res = SER.set_speed('9600')
 	imei = utils.getimei()
 	time = Log.uptime()
 	smsmsg = time + ' Starting Unit: ' + imei
@@ -87,9 +89,10 @@ def Mainloop():
 				if (NUpdate.isexpired() and data != -1):
 					Log.ReportError('Doing timeout Update')
 					data["dyn"] = "0"
+					Chronos.set_LockFlag()
 					res = updateloop(hname,data,MAX_ERRORS)
 					gp = disGPRS()
-					NUpdate.start(30)
+					NUpdate.start(3600)
 					if res == -1:
 						break
 					serv_data = data
@@ -128,6 +131,34 @@ def Mainloop():
 ##############################################################################
 ##############END OF DYNAMIC UPDATE ROUTINE###################################
 ##############################################################################
+##############################################################################
+##############Start revision of wireless alert####
+			try:
+				SER.send('SWICHT_LED\r')
+				if(Chronos.check_PannicFlag() == 0):
+					data["dyn"] = "2"
+					res = updateloop(hname,data,MAX_ERRORS)
+					if res == -1:
+						Log.ReportError('Error in updateloop')
+						break
+					else:
+						Chronos.reset_PannicFlag()
+					serv_data = data
+					NUpdate.start(10)
+
+				if(Chronos.check_LockFlag() == 0 and serv_data["dyn"] == "1"):
+					data["dyn"] = "3"
+					res = updateloop(hname,data,MAX_ERRORS)
+					if res == -1:
+						Log.ReportError('Error in updateloop')
+						break
+					serv_data = data
+					NUpdate.start(10)
+				
+
+			except (Exception, StandardError, SystemError, RuntimeError):
+				msg = 'Expception in Dynamic Update '
+				Log.appendLog(msg)
 
 ##############################################################################
 ###############SMS CHECK######################################################
@@ -138,10 +169,10 @@ def Mainloop():
 					data = SMS.ReadMessage(msg)
 					SER.send('New message from:')
 					SER.send(data['phn'])
-					SER.send('\r\n')
+					SER.send('\r')
 					SER.send('SMS Contents:')
 					SER.send(data['sms'])
-					SER.send('---END OF SMS\r\n')
+					SER.send('---END OF SMS\r')
 					SMS.DelMessage(msg)
 					CmdMnger.ProcessCMD(data['sms'],data['phn'])
 					
@@ -235,12 +266,12 @@ def connectGPRS():
 	if (res == -1):
 		printdbg.printSER('Error setting PDP context')
 		SER.send('Error setting PDP context')
-		SER.send('\r\n')
+		SER.send('\r')
 		return -1
 	else:
 		res = ' '
 		while (res.find('#SGACT:')== -1 and res.find('already activated') == -1):
-			SER.send('Opening WEB connection\r\n')
+			SER.send('Opening WEB connection\r')
 			res = MDM.send('AT#SGACT=1,1\r',0)
 			res = MDM.receive(2*TIMEOUT_CONNECT)
 			SER.send(res)	
@@ -277,7 +308,7 @@ def dial_serv():
 	if ( res != -1 ):
 		print 'CONNECTED'
 		SER.send('CONNECTED')
-		SER.send('\r\n')
+		SER.send('\r')
 		return 1
 	else:
 		resturn -1

@@ -31,20 +31,20 @@ def check4SMS():
 	data = ''
 	MDM.send('AT+CMGL="REC UNREAD"\r',0)
 	while ((data.find('OK') == -1) and (timer >0) and (data.find('+CMS ERROR')==-1)):
-		SER.send('...Listing SIM UNREAD MESAGESS\r\n')
+		SER.send('...Listing SIM UNREAD MESAGESS\r')
 		datatmp = MDM.receive(5)
 		data = data + datatmp
 		timer = timeout - MOD.secCounter()
 		wd.feed()
 
 	if (data.find('+CMGL:') == -1):
-		SER.send('No new messages\r\n')
+		SER.send('No new messages\r')
 		return -1
 	else:
 		lindx = data.find('+CMGL: ')
 		uindx = data.find(',"REC')
 		slot = data[lindx+7:uindx]
-		msg = 'New message received and stored on slot: ' + slot + '\r\n'
+		msg = 'New message received and stored on slot: ' + slot + '\r'
 		SER.send(msg)
 		return slot
 
@@ -65,7 +65,7 @@ def ReadMessage(number):
 def DelMessage(number):
 	SER.send('Deleting Message on slot: ')
 	SER.send(number)
-	SER.send('\r\n')
+	SER.send('\r')
 	res = scmd.sendCmd('AT+CMGF', '1', 10)
 	res = scmd.sendCmd('AT+CMGD', number, 10)
 	return
