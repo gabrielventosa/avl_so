@@ -10,3 +10,4 @@ try:
 except (Exception, StandardError, SystemError, RuntimeError):
     b = GPIO.setIOvalue(11, 0)
     MOD.sleep(10)
+    print "exception in  main"

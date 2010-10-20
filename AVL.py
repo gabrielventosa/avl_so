@@ -19,7 +19,7 @@ import CmdMnger
 import SER
 import DelSMS
 import Chronos
-
+import gprs
 
 
 ################## timeout definitions #######################
@@ -41,17 +41,11 @@ def Mainloop():
 
 	wd.feed()
 	
-	numrep = '5539099305'
 	res = SER.set_speed('9600')
 	imei = utils.getimei()
 	time = Log.uptime()
 	smsmsg = time + ' Starting Unit: ' + imei
-#	res = SMS.sendSMS(numrep,smsmsg)
 	res = MDM.receive(20)
-#	res = MDM.send('atd5539099305;\r',0)
-#	res = MDM.receive(50)
-#	res = MDM.send('ATH\r',0)
-#	res = MDM.receive(50)
 	res = scmd.sendCmd('AT+CMGF', '1', 50)
 	res = 1
 	
@@ -66,14 +60,14 @@ def Mainloop():
 	res = scmd.sendCmd('at+cfun','5',10)
 	serv_data = -1
 	
-	while 1:
-		hname = gethname()
+	while 1:	
+		hname = gprs.gethname()
 		printdbg.printSER(hname)
 		NUpdate = timers.timer(0)
 		NUpdate.start(3)
+		print "Ready to start main loop"
 		Mto = timers.timer(0)
 		Mto.start(120)
-		
 		while 1:
 			wd.feed()
 			printdbg.printSER("Doing GPS")
@@ -87,11 +81,12 @@ def Mainloop():
 ###############################################################################
 			try:
 				if (NUpdate.isexpired() and data != -1):
+					print "ready to static update"
 					Log.ReportError('Doing timeout Update')
 					data["dyn"] = "0"
 					Chronos.set_LockFlag()
-					res = updateloop(hname,data,MAX_ERRORS)
-					gp = disGPRS()
+					res = gprs.updateloop(hname,data,MAX_ERRORS)
+					gp = gprs.disGPRS()
 					NUpdate.start(3600)
 					if res == -1:
 						break
@@ -99,7 +94,7 @@ def Mainloop():
 			except (Exception, StandardError, SystemError, RuntimeError):
 				msg = 'Expception in Static Update: '
 				Log.appendLog(msg)
-				
+				print "exception in static update"
 
 ###############################################################################
 ############END OF STATIC UPDATE ROUTINE#######################################
@@ -117,7 +112,7 @@ def Mainloop():
 				    utils.dist(serv_data["latitud"],data["latitud"],serv_data["longitud"],data["longitud"]) > 5000:
 					Log.ReportError('Dynamic Routine Update')
 					data["dyn"] = "1"
-					res = updateloop(hname,data,MAX_ERRORS)
+					res = gprs.updateloop(hname,data,MAX_ERRORS)
 					if res == -1:
 						Log.ReportError('Error in updateloop')
 						break
@@ -127,17 +122,19 @@ def Mainloop():
 			except (Exception, StandardError, SystemError, RuntimeError):
 				msg = 'Expception in Dynamic Update '
 				Log.appendLog(msg)
+				print "exception in dynamic update"
 				
 ##############################################################################
 ##############END OF DYNAMIC UPDATE ROUTINE###################################
 ##############################################################################
 ##############################################################################
-##############Start revision of wireless alert####
+##############Start revision of wireless alert##		
 			try:
 				SER.send('SWICHT_LED\r')
-				if(Chronos.check_PannicFlag() == 0):
+				if(Chronos.check_PannicFlag() == 1):
+					print 'Doing Pannic Update'
 					data["dyn"] = "2"
-					res = updateloop(hname,data,MAX_ERRORS)
+					res = gprs.updateloop(hname,data,MAX_ERRORS)
 					if res == -1:
 						Log.ReportError('Error in updateloop')
 						break
@@ -148,7 +145,7 @@ def Mainloop():
 
 				if(Chronos.check_LockFlag() == 0 and serv_data["dyn"] == "1"):
 					data["dyn"] = "3"
-					res = updateloop(hname,data,MAX_ERRORS)
+					res = gprs.updateloop(hname,data,MAX_ERRORS)
 					if res == -1:
 						Log.ReportError('Error in updateloop')
 						break
@@ -179,7 +176,7 @@ def Mainloop():
 			except (Exception, StandardError, SystemError, RuntimeError):
 				msg = 'Expception in SMS'
 				Log.appendLog(msg)
-
+				print "exception in SMS check"
 
 ##############################################################################
 ###############SMS Delete######################################################
@@ -191,148 +188,7 @@ def Mainloop():
 			except (Exception, StandardError, SystemError, RuntimeError):
 				msg = 'Expception in SMS'
 				Log.appendLog(msg)
+				print "exception in SMS delete"
 				
 	return
 	
-def Update(hname,data):
-###############################################
-	printdbg.printSER("Attemping Update")
-	Log.appendLog("Attemping Update")
-	
-###############################################
-		
-###############################################
-	res = utils.getBattery()
-	if (res == -1):
-		errmsg = "Battey Read Error"
-		Log.ReportError(errmsg)
-		return -1
-	else:
-		data["batt"]=res
-	data["imei"] = utils.getimei()
-###############################################
-	
-	
-	
-###############################################
-	printdbg.printSER("Checking GPRS")
-	if (is_gprs() == -1):
-		printdbg.printSER('GPRS OFF')
-		printdbg.printSER("Doing GPRS")
-		res = connectGPRS()
-		if (res == -1):
-			errmsg ='Error Connecting to GPRS'
-			Log.ReportError(errmsg)
-			return -1
-
-	printdbg.printSER("Dialing Server")
-	led = scmd.sendCmd('AT#SLED','3,1,1',10)
-	res = dial_serv()
-	if (res == -1):
-		errmsg = 'No server'
-		Log.ReportError(errmsg)
-		return -1
-		
-################################################
-	printdbg.printSER("Doing Chat")
-	res = Chat.updchat(hname, data)
-	led = scmd.sendCmd('AT#SLED','2',10)
-	if (res == -1):
-		errmsg = "Sever Response Error"
-		Log.ReportError(errmsg)
-		return -1
-	
-	return 1
-
-
-#established a GPRS connection
-def connectGPRS():
-	printdbg.printSER('connect GPRS')
-	numCheck = 4
-	TIMEOUT_CMD = 50
-	CGDCONT = netcfg.CGDCONT
-	USERID = netcfg.USERID
-	PASSW = netcfg.PASSW
-
-	#################################################
-	#############Set user and password###############
-	res = scmd.sendCmd('AT#USERID',USERID,10)
-	res = scmd.sendCmd('AT#PASSW',PASSW,10)
-	
-	############# define the PDP context #############
-	##########################################
-	res = scmd.sendCmd('AT+CGDCONT',CGDCONT,10)
-	res = res.find ('OK')
-	if (res == -1):
-		printdbg.printSER('Error setting PDP context')
-		SER.send('Error setting PDP context')
-		SER.send('\r')
-		return -1
-	else:
-		res = ' '
-		while (res.find('#SGACT:')== -1 and res.find('already activated') == -1):
-			SER.send('Opening WEB connection\r')
-			res = MDM.send('AT#SGACT=1,1\r',0)
-			res = MDM.receive(2*TIMEOUT_CONNECT)
-			SER.send(res)	
-
-	return 1
-
-#######################################
-
-	
-
-
-
-
-def is_gprs():
-	res = scmd.sendCmd('AT#GPRS?','',10)
-	if(res.find('#GPRS: 1') == -1):
-		return -1
-	return 1
-
-def dial_serv():
-	res = MDM.send('AT#SD=1,0,80,"',0)
-	res = MDM.send(netcfg.hname,0)
-	res = MDM.send('"\r',0)
-############ open the connection with the internet host
-	timer = MOD.secCounter()
-	timeout = MOD.secCounter() + TIMEOUT_CONNECT
-	res = MDM.receive(TIMEOUT_MINIMUM)
-	res = res.find('CONNECT')
-############# wait for connect ############
-	while ((res == -1)and (timer > 0) ):
-		res = MDM.receive(TIMEOUT_MINIMUM)
-		res = res.find('CONNECT')
-		timer = timeout - MOD.secCounter()
-	if ( res != -1 ):
-		print 'CONNECTED'
-		SER.send('CONNECTED')
-		SER.send('\r')
-		return 1
-	else:
-		resturn -1
-
-
-def gethname():
-	hname = -1
-	wd.feed()
-	hname = netcfg.hname
-	return hname
-
-def updateloop(hname,data,MAX_ERRORS):
-	for i in range(MAX_ERRORS):
-		res = Update(hname,data)
-		if res == 1:
-			break
-	if (res == -1):
-		gp = disGPRS()
-		res = Update(hname,data)
-		gp = disGPRS()
-	return res
-
-def disGPRS():
-	if(is_gprs != -1):
-		res = scmd.sendCmd('AT#SGACT','1,0',50)
-
-	return res

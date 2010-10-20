@@ -30,9 +30,10 @@ def reset_LockFlag():
 def check_PannicFlag():
 	res = SER.receive(15)
 	res = SER.send('GET_PANNIC_STATUS\r')
-	res = SER.receive(15)
+	res = SER.receivebyte(20)
 
-	if(res.find('NOPANNIC' != -1)):
+	if(res == 97):
+		print 
 		#nopannic returns 1
 		res = 1
 	#pannic returns 0
